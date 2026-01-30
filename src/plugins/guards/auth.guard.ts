@@ -1,0 +1,24 @@
+import { JWT } from "@/models";
+import {
+	BadRequestException,
+	UnauthorizedException,
+} from "@caffeine/errors/application";
+import bearer from "@elysiajs/bearer";
+import Elysia from "elysia";
+import type { IAuthOptions } from "./types/auth-options.interface";
+
+export const AuthGuard = (options: IAuthOptions) => {
+	return new Elysia()
+		.use(bearer())
+		.decorate("jwt", new JWT(options.layerName))
+		.onBeforeHandle(async ({ bearer, jwt }) => {
+			if (!bearer) throw new BadRequestException(options.layerName);
+
+			const {
+				payload: { ACCESS_KEY },
+			} = await jwt.verify<{ ACCESS_KEY: string | null }>(bearer);
+
+			if (!ACCESS_KEY || ACCESS_KEY !== process.env.ACCESS_KEY)
+				throw new UnauthorizedException(options.layerName);
+		});
+};

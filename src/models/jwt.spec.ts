@@ -1,0 +1,49 @@
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { JWT } from "./jwt";
+import {
+	UnableToSignPayloadException,
+	InvalidJWTException,
+} from "@caffeine/errors/application/jwt";
+import { SignJWT } from "jose";
+
+describe("JWT Model", () => {
+	beforeEach(() => {
+		vi.resetModules();
+		vi.restoreAllMocks();
+		process.env.JWT_SECRET = "test-secret";
+	});
+
+	it("should sign a payload successfully", async () => {
+		const jwt = new JWT("test-layer");
+		const token = await jwt.sign({ foo: "bar" });
+		expect(typeof token).toBe("string");
+		expect(token.split(".").length).toBe(3);
+	});
+
+	it("should verify a valid token successfully", async () => {
+		const jwt = new JWT("test-layer");
+		const token = await jwt.sign({ foo: "bar" });
+
+		const result = await jwt.verify<{ foo: string }>(token);
+		expect(result.payload.foo).toBe("bar");
+	});
+
+	it("should throw UnableToSignPayloadException when signing fails", async () => {
+		// Mock SignJWT to throw an error
+		vi.spyOn(SignJWT.prototype, "sign").mockRejectedValue(
+			new Error("Sign error"),
+		);
+
+		const jwt = new JWT("test-layer");
+		await expect(jwt.sign({ foo: "bar" })).rejects.toThrow(
+			UnableToSignPayloadException,
+		);
+	});
+
+	it("should throw InvalidJWTException when verification fails", async () => {
+		const jwt = new JWT("test-layer");
+		await expect(jwt.verify("invalid.token.here")).rejects.toThrow(
+			InvalidJWTException,
+		);
+	});
+});
