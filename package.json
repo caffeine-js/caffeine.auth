@@ -55,6 +55,8 @@
   "dependencies": {
     "@caffeine/errors": "link:@caffeine/errors",
     "@caffeine/models": "link:@caffeine/models",
+    "@caffeine/redis-drive": "link:@caffeine/redis-drive",
+    "@caffeine/constants": "link:@caffeine/constants",
     "jose": "^6.1.3"
   }
 }

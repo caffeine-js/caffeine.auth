@@ -9,16 +9,33 @@ vi.mock("@/models", () => {
 	return { JWT };
 });
 
+vi.mock("@/utils/access-key", () => ({
+	AccessKey: {
+		get: vi.fn(),
+		set: vi.fn(),
+	},
+}));
+
+vi.mock("@caffeine/models/dtos/api", async (importOriginal) => {
+	// Import t from elysia to create a valid schema
+	const { t } = await import("elysia");
+	return {
+		AuthorizationDTO: t.Object({
+			authorization: t.String(),
+		}),
+	};
+});
+
 // Import after mocking
 import { AuthGuard } from "./auth.guard";
 import { JWT } from "@/models";
+import { AccessKey } from "@/utils/access-key";
 // import { BadRequestException, UnauthorizedException, } from "@caffeine/errors/application"; // Unused in this test file directly? Or used to check instanceof error? using response status is better.
 
 describe("AuthGuard", () => {
 	beforeEach(() => {
 		vi.resetModules();
 		vi.clearAllMocks();
-		process.env.ACCESS_KEY = "test-access-key";
 
 		// Setup default mock implementation for each test
 		// This makes JWT a constructor mock that returns an object with verify
@@ -53,6 +70,7 @@ describe("AuthGuard", () => {
 	});
 
 	it("should throw UnauthorizedException if ACCESS_KEY in token does not match env", async () => {
+		vi.mocked(AccessKey.get).mockResolvedValue("correct-key");
 		mockVerify.mockResolvedValue({
 			payload: { ACCESS_KEY: "wrong-key" },
 		});
@@ -61,7 +79,7 @@ describe("AuthGuard", () => {
 		const testApp = app.get("/", () => "success");
 
 		const request = new Request("http://localhost/", {
-			headers: { Authorization: "Bearer valid.token" },
+			headers: { authorization: "Bearer valid.token" },
 		});
 
 		const res = await testApp.handle(request);
@@ -71,6 +89,7 @@ describe("AuthGuard", () => {
 	});
 
 	it("should throw UnauthorizedException if ACCESS_KEY is missing in token", async () => {
+		vi.mocked(AccessKey.get).mockResolvedValue("correct-key");
 		mockVerify.mockResolvedValue({
 			payload: { ACCESS_KEY: null },
 		});
@@ -79,7 +98,7 @@ describe("AuthGuard", () => {
 		const testApp = app.get("/", () => "success");
 
 		const request = new Request("http://localhost/", {
-			headers: { Authorization: "Bearer valid.token" },
+			headers: { authorization: "Bearer valid.token" },
 		});
 
 		const res = await testApp.handle(request);
@@ -88,8 +107,9 @@ describe("AuthGuard", () => {
 	});
 
 	it("should pass if token has correct ACCESS_KEY", async () => {
+		vi.mocked(AccessKey.get).mockResolvedValue("correct-key");
 		mockVerify.mockResolvedValue({
-			payload: { ACCESS_KEY: process.env.ACCESS_KEY },
+			payload: { ACCESS_KEY: "correct-key" },
 		});
 
 		const app = AuthGuard({ layerName: "test-layer" });
@@ -97,7 +117,7 @@ describe("AuthGuard", () => {
 		const testApp = app.get("/", () => "success");
 
 		const request = new Request("http://localhost/", {
-			headers: { Authorization: "Bearer valid.token" },
+			headers: { authorization: "Bearer valid.token" },
 		});
 
 		const res = await testApp.handle(request);

@@ -5,6 +5,13 @@ vi.mock("@/utils/verify-credentials", () => ({
 	verifyCredentials: vi.fn(),
 }));
 
+vi.mock("@/utils/access-key", () => ({
+	AccessKey: {
+		set: vi.fn().mockImplementation(async (val) => val),
+		get: vi.fn(),
+	},
+}));
+
 // Types
 import type { UnauthorizedException } from "@caffeine/errors/application";
 // We don't import GetAccessController here to avoid early initialization
@@ -13,7 +20,6 @@ describe("GetAccessController", () => {
 	beforeEach(() => {
 		vi.resetModules(); // Clears cache of imported modules
 		vi.stubEnv("JWT_SECRET", "test-secret");
-		vi.stubEnv("ACCESS_KEY", "old-key");
 	});
 
 	afterEach(() => {
@@ -24,11 +30,13 @@ describe("GetAccessController", () => {
 	async function getController() {
 		const { GetAccessController } = await import("./get-access.controller");
 		const { verifyCredentials } = await import("@/utils/verify-credentials");
-		return { GetAccessController, verifyCredentials };
+		const { AccessKey } = await import("@/utils/access-key");
+		return { GetAccessController, verifyCredentials, AccessKey };
 	}
 
 	it("should return a token when credentials are valid and update ACCESS_KEY", async () => {
-		const { GetAccessController, verifyCredentials } = await getController();
+		const { GetAccessController, verifyCredentials, AccessKey } =
+			await getController();
 		vi.mocked(verifyCredentials).mockReturnValue(true);
 
 		const body = {
@@ -47,9 +55,8 @@ describe("GetAccessController", () => {
 
 		expect(response.status).toBe(200);
 		expect(data).toHaveProperty("token");
-		expect(process.env.ACCESS_KEY).not.toBe("old-key");
-		expect(process.env.ACCESS_KEY).toBeDefined();
 		expect(verifyCredentials).toHaveBeenCalledWith(body, "auth@login");
+		expect(AccessKey.set).toHaveBeenCalled();
 	});
 
 	it("should return 401/500 when credentials are invalid (UnauthorizedException)", async () => {

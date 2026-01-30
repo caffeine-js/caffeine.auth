@@ -7,6 +7,7 @@ import bearer from "@elysiajs/bearer";
 import Elysia from "elysia";
 import type { IAuthOptions } from "./types/auth-options.interface";
 import { AuthorizationDTO } from "@caffeine/models/dtos/api";
+import { AccessKey } from "@/utils/access-key";
 
 export const AuthGuard = (options: IAuthOptions) => {
 	return new Elysia()
@@ -23,7 +24,9 @@ export const AuthGuard = (options: IAuthOptions) => {
 				payload: { ACCESS_KEY },
 			} = await jwt.verify<{ ACCESS_KEY: string | null }>(bearer);
 
-			if (!ACCESS_KEY || ACCESS_KEY !== process.env.ACCESS_KEY)
+			const currentAccessKey = await AccessKey.get();
+
+			if (!ACCESS_KEY || ACCESS_KEY !== currentAccessKey)
 				throw new UnauthorizedException(options.layerName);
 		});
 };
