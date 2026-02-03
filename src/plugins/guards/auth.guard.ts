@@ -8,6 +8,7 @@ import Elysia from "elysia";
 import type { IAuthOptions } from "./types/auth-options.interface";
 import { AuthorizationDTO } from "@caffeine/models/dtos/api";
 import { AccessKey } from "@/utils/access-key";
+import { t } from "@caffeine/models";
 
 export const AuthGuard = (options: IAuthOptions) => {
 	return new Elysia()
@@ -15,6 +16,9 @@ export const AuthGuard = (options: IAuthOptions) => {
 		.guard({
 			as: "scoped",
 			headers: AuthorizationDTO,
+			response: {
+				400: t.String(),
+			},
 		})
 		.decorate("jwt", new JWT(options.layerName))
 		.onBeforeHandle(async ({ bearer, jwt }) => {
