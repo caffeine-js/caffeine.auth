@@ -1,6 +1,6 @@
 import { VerifyCredentialsDTO } from "@/dtos";
-import { Schema } from "@caffeine/models";
 import { BadRequestException } from "@caffeine/errors/application";
+import { Schema } from "@caffeine/schema";
 
 export function verifyCredentials(
 	data: VerifyCredentialsDTO,

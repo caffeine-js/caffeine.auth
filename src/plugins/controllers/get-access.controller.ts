@@ -2,8 +2,8 @@ import { VerifyCredentialsDTO } from "@/dtos";
 import { JWT } from "@/models";
 import { AccessKey } from "@/utils/access-key";
 import { verifyCredentials } from "@/utils/verify-credentials";
+import { generateUUID } from "@caffeine/entity/helpers";
 import { UnauthorizedException } from "@caffeine/errors/application";
-import { generateUUID } from "@caffeine/models/helpers";
 import Elysia from "elysia";
 
 export const GetAccessController = new Elysia()
