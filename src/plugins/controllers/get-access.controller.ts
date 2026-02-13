@@ -62,6 +62,8 @@ export const GetAccessController = new Elysia()
 			detail: {
 				summary: "Authenticate user",
 				tags: ["Auth"],
+				description:
+					"Authenticates the user and generates a unique session access key stored in a secure cookie. Features rate limiting with progressive recovery and protection against account enumeration.",
 			},
 		},
 	);
