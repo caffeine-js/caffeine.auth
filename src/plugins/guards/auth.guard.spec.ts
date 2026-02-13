@@ -37,8 +37,6 @@ describe("AuthGuard", () => {
 		vi.resetModules();
 		vi.clearAllMocks();
 
-		// Setup default mock implementation for each test
-		// This makes JWT a constructor mock that returns an object with verify
 		vi.mocked(JWT).mockImplementation(function () {
 			return {
 				sign: mockSign,
@@ -47,77 +45,61 @@ describe("AuthGuard", () => {
 		});
 	});
 
-	it("should throw BadRequestException if bearer token is missing", async () => {
+	it("should throw BadRequestException if ACCESS_TOKEN cookie is missing", async () => {
 		const app = AuthGuard({ layerName: "test-layer" });
-
-		// Simulate a request without bearer token
-		// Since we cannot easily construct a context for the internal handler,
-		// we can test the behavior by creating a request and handling it with the app
+		const testApp = app.get("/", () => "success");
 		const request = new Request("http://localhost/");
 
-		// We expect the guard to throw or return an error response
-		// Elysia handle catches errors, so we check the response status/body or if it throws
-		// If BadRequestException is unhandled, it might resolve to a 400 or 500
-
-		// However, AuthGuard returns an Elysia instance. Let's add a test route to it.
-		const testApp = app.get("/", () => "success");
-
 		const res = await testApp.handle(request);
-
-		// If BadRequestException is thrown, Elysia by default returns 500 or 400 if mapped.
-		// Let's assume it fails.
 		expect(res.status).not.toBe(200);
 	});
 
-	it("should throw UnauthorizedException if ACCESS_KEY in token does not match env", async () => {
+	it("should throw UnauthorizedException if ACCESS_KEY in token does not match Redis", async () => {
 		vi.mocked(AccessKey.get).mockResolvedValue("correct-key");
 		mockVerify.mockResolvedValue({
-			payload: { ACCESS_KEY: "wrong-key" },
+			payload: { ACCESS_KEY: "wrong-key", EMAIL: "test@example.com" },
 		});
 
 		const app = AuthGuard({ layerName: "test-layer" });
 		const testApp = app.get("/", () => "success");
 
 		const request = new Request("http://localhost/", {
-			headers: { authorization: "Bearer valid.token" },
+			headers: { cookie: "ACCESS_TOKEN=valid.token" },
 		});
 
 		const res = await testApp.handle(request);
-
 		expect(res.status).not.toBe(200);
 		expect(mockVerify).toHaveBeenCalled();
+		expect(AccessKey.get).toHaveBeenCalledWith("test@example.com");
 	});
 
-	it("should throw UnauthorizedException if ACCESS_KEY is missing in token", async () => {
-		vi.mocked(AccessKey.get).mockResolvedValue("correct-key");
+	it("should throw ResourceNotFoundException if EMAIL is missing in token", async () => {
 		mockVerify.mockResolvedValue({
-			payload: { ACCESS_KEY: null },
+			payload: { ACCESS_KEY: "any", EMAIL: null },
 		});
 
 		const app = AuthGuard({ layerName: "test-layer" });
 		const testApp = app.get("/", () => "success");
 
 		const request = new Request("http://localhost/", {
-			headers: { authorization: "Bearer valid.token" },
+			headers: { cookie: "ACCESS_TOKEN=valid.token" },
 		});
 
 		const res = await testApp.handle(request);
-
 		expect(res.status).not.toBe(200);
 	});
 
-	it("should pass if token has correct ACCESS_KEY", async () => {
+	it("should pass if token has correct ACCESS_KEY and EMAIL", async () => {
 		vi.mocked(AccessKey.get).mockResolvedValue("correct-key");
 		mockVerify.mockResolvedValue({
-			payload: { ACCESS_KEY: "correct-key" },
+			payload: { ACCESS_KEY: "correct-key", EMAIL: "test@example.com" },
 		});
 
 		const app = AuthGuard({ layerName: "test-layer" });
-		// Add a simple handler to verify control flow reaches it
 		const testApp = app.get("/", () => "success");
 
 		const request = new Request("http://localhost/", {
-			headers: { authorization: "Bearer valid.token" },
+			headers: { cookie: "ACCESS_TOKEN=valid.token" },
 		});
 
 		const res = await testApp.handle(request);
@@ -125,6 +107,6 @@ describe("AuthGuard", () => {
 
 		expect(res.status).toBe(200);
 		expect(text).toBe("success");
-		expect(mockVerify).toHaveBeenCalled();
+		expect(AccessKey.get).toHaveBeenCalledWith("test@example.com");
 	});
 });

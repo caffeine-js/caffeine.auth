@@ -1,24 +1,25 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 // Pre-mock dependencies so imports work
-vi.mock("@/utils/verify-credentials", () => ({
+vi.mock("@/utils", () => ({
 	verifyCredentials: vi.fn(),
-}));
-
-vi.mock("@/utils/access-key", () => ({
 	AccessKey: {
 		set: vi.fn().mockImplementation(async (val) => val),
 		get: vi.fn(),
+	},
+	LoginAttempt: {
+		check: vi.fn(),
+		fail: vi.fn(),
+		success: vi.fn(),
 	},
 }));
 
 // Types
 import type { UnauthorizedException } from "@caffeine/errors/application";
-// We don't import GetAccessController here to avoid early initialization
 
 describe("GetAccessController", () => {
 	beforeEach(() => {
-		vi.resetModules(); // Clears cache of imported modules
+		vi.resetModules();
 		vi.stubEnv("JWT_SECRET", "test-secret");
 	});
 
@@ -29,58 +30,75 @@ describe("GetAccessController", () => {
 
 	async function getController() {
 		const { GetAccessController } = await import("./get-access.controller");
-		const { verifyCredentials } = await import("@/utils/verify-credentials");
-		const { AccessKey } = await import("@/utils/access-key");
-		return { GetAccessController, verifyCredentials, AccessKey };
+		const { verifyCredentials, AccessKey, LoginAttempt } = await import(
+			"@/utils"
+		);
+		return { GetAccessController, verifyCredentials, AccessKey, LoginAttempt };
 	}
 
-	it("should return a token when credentials are valid and update ACCESS_KEY", async () => {
-		const { GetAccessController, verifyCredentials, AccessKey } =
-			await getController();
-		vi.mocked(verifyCredentials).mockReturnValue(true);
-
-		const body = {
-			email: "test@example.com",
-			password: "Password123!",
-		};
+	it("should return 429 when no attempts are left", async () => {
+		const { GetAccessController, LoginAttempt } = await getController();
+		vi.mocked(LoginAttempt.check).mockResolvedValue(0);
 
 		const request = new Request("http://localhost/auth/login", {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify(body),
+			body: JSON.stringify({
+				email: "test@example.com",
+				password: "Password123!",
+			}),
 		});
 
 		const response = await GetAccessController.handle(request);
-		const data = await response.json();
 
-		expect(response.status).toBe(200);
-		expect(data).toHaveProperty("token");
-		expect(verifyCredentials).toHaveBeenCalledWith(body, "auth@login");
-		expect(AccessKey.set).toHaveBeenCalled();
+		expect(response.status).toBe(429);
+		expect(await response.text()).toBe("Too many attempts. Try again later.");
 	});
 
-	it("should return 401/500 when credentials are invalid (UnauthorizedException)", async () => {
-		const { GetAccessController, verifyCredentials } = await getController();
+	it("should return 200 (the curse) and decrease attempts on invalid credentials", async () => {
+		const { GetAccessController, verifyCredentials, LoginAttempt, AccessKey } =
+			await getController();
+		vi.mocked(LoginAttempt.check).mockResolvedValue(5);
 		vi.mocked(verifyCredentials).mockReturnValue(false);
-
-		const body = {
-			email: "wrong@example.com",
-			password: "Password123!",
-		};
+		vi.mocked(LoginAttempt.fail).mockResolvedValue(4);
 
 		const request = new Request("http://localhost/auth/login", {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify(body),
+			body: JSON.stringify({
+				email: "test@example.com",
+				password: "Password123!",
+			}),
 		});
 
-		// Since Elysia catches errors and returns a response, verify the status code
-		// UnauthorizedException usually maps to 401 or handled as 500 if not caught explicitly.
-		// We expect the request to NOT succeed.
 		const response = await GetAccessController.handle(request);
-		expect(response.status).not.toBe(200);
 
-		// If we want to check that verifyCredentials was called
-		expect(verifyCredentials).toHaveBeenCalled();
+		// Status 200 because of the "curse" logic: it always returns a token (fake or real)
+		expect(response.status).toBe(200);
+		expect(LoginAttempt.fail).toHaveBeenCalledWith("test@example.com", 5);
+		expect(AccessKey.set).toHaveBeenCalledWith(
+			"test@example.com",
+			expect.any(String),
+		);
+	});
+
+	it("should reset attempts on successful login", async () => {
+		const { GetAccessController, verifyCredentials, LoginAttempt } =
+			await getController();
+		vi.mocked(LoginAttempt.check).mockResolvedValue(3);
+		vi.mocked(verifyCredentials).mockReturnValue(true);
+
+		const request = new Request("http://localhost/auth/login", {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({
+				email: "test@example.com",
+				password: "Password123!",
+			}),
+		});
+
+		await GetAccessController.handle(request);
+
+		expect(LoginAttempt.success).toHaveBeenCalledWith("test@example.com");
 	});
 });
