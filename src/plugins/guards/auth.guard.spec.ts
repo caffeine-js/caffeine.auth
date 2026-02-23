@@ -27,7 +27,7 @@ vi.mock("@caffeine/models/dtos/api", async (importOriginal) => {
 });
 
 // Import after mocking
-import { AuthGuard } from "./auth.guard";
+import { CaffeineAuth } from "./auth.guard";
 import { JWT } from "@/models";
 import { AccessKey } from "@/utils/access-key";
 // import { BadRequestException, UnauthorizedException, } from "@caffeine/errors/application"; // Unused in this test file directly? Or used to check instanceof error? using response status is better.
@@ -46,7 +46,7 @@ describe("AuthGuard", () => {
 	});
 
 	it("should throw BadRequestException if ACCESS_TOKEN cookie is missing", async () => {
-		const app = AuthGuard({ layerName: "test-layer" });
+		const app = CaffeineAuth({ layerName: "test-layer" });
 		const testApp = app.get("/", () => "success");
 		const request = new Request("http://localhost/");
 
@@ -60,7 +60,7 @@ describe("AuthGuard", () => {
 			payload: { ACCESS_KEY: "wrong-key", EMAIL: "test@example.com" },
 		});
 
-		const app = AuthGuard({ layerName: "test-layer" });
+		const app = CaffeineAuth({ layerName: "test-layer" });
 		const testApp = app.get("/", () => "success");
 
 		const request = new Request("http://localhost/", {
@@ -78,7 +78,7 @@ describe("AuthGuard", () => {
 			payload: { ACCESS_KEY: "any", EMAIL: null },
 		});
 
-		const app = AuthGuard({ layerName: "test-layer" });
+		const app = CaffeineAuth({ layerName: "test-layer" });
 		const testApp = app.get("/", () => "success");
 
 		const request = new Request("http://localhost/", {
@@ -95,7 +95,7 @@ describe("AuthGuard", () => {
 			payload: { ACCESS_KEY: "correct-key", EMAIL: "test@example.com" },
 		});
 
-		const app = AuthGuard({ layerName: "test-layer" });
+		const app = CaffeineAuth({ layerName: "test-layer" });
 		const testApp = app.get("/", () => "success");
 
 		const request = new Request("http://localhost/", {

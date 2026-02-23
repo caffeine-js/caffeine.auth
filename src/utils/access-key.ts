@@ -1,4 +1,4 @@
-import { MAX_ITEMS_PER_QUERY } from "@caffeine/constants";
+import { CACHE_EXPIRATION_TIME } from "@caffeine/constants";
 import { redis } from "@caffeine/redis-drive";
 
 export const AccessKey = {
@@ -7,7 +7,7 @@ export const AccessKey = {
 	},
 
 	set: async (email: string, value: string): Promise<string> => {
-		await redis.setex(`access-key:${email}`, MAX_ITEMS_PER_QUERY, value);
+		await redis.setex(`access-key:${email}`, CACHE_EXPIRATION_TIME.SAFE, value);
 
 		return value;
 	},
