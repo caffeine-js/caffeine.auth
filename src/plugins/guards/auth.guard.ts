@@ -6,12 +6,23 @@ import {
 import Elysia from "elysia";
 import type { IAuthOptions } from "./types/auth-options.interface";
 import { AccessKey } from "@/utils/access-key";
+import {
+	BadRequestExceptionDTO,
+	UnauthorizedExceptionDTO,
+} from "@/dtos/errors";
 
 export const CaffeineAuth = (options: IAuthOptions) => {
 	const SERVICE_NAME = `jwt:for-${options.layerName}`;
 
 	return new Elysia()
 		.decorate(SERVICE_NAME, new JWT(options.layerName))
+		.guard({
+			as: "scoped",
+			response: {
+				400: BadRequestExceptionDTO,
+				401: UnauthorizedExceptionDTO,
+			},
+		})
 		.onBeforeHandle(
 			async ({ cookie: { ACCESS_TOKEN }, [SERVICE_NAME]: jwt }) => {
 				if (!ACCESS_TOKEN || typeof ACCESS_TOKEN.value !== "string")
