@@ -5,9 +5,14 @@ import {
 } from "@caffeine/errors/application/jwt";
 
 export class JWT {
-	private readonly secret = new TextEncoder().encode(process.env.JWT_SECRET);
+	private readonly secret: Uint8Array;
 
-	constructor(private readonly layerName: string) {}
+	constructor(
+		private readonly layerName: string,
+		secret: string,
+	) {
+		this.secret = new TextEncoder().encode(secret);
+	}
 
 	async sign(content: JWTPayload) {
 		try {

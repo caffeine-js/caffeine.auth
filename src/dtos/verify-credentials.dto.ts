@@ -1,11 +1,11 @@
 import { t } from "@caffeine/models";
+import { PasswordDTO } from "@caffeine/models/dtos";
+import { EmailDTO } from "@caffeine/models/dtos/primitives";
 
 export const VerifyCredentialsDTO = t.Object(
 	{
-		email: t.String({
-			description: "The user's email address.",
-		}),
-		password: t.String(),
+		email: EmailDTO,
+		password: PasswordDTO,
 	},
 	{
 		description: "Data required to verify user credentials.",

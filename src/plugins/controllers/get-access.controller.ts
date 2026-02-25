@@ -1,55 +1,50 @@
-import { VerifyCredentialsDTO } from "@/dtos";
+import { AuthEnvDependenciesDTO, VerifyCredentialsDTO } from "@/dtos";
+import {
+	BadRequestExceptionDTO,
+	DatabaseUnavailableExceptionDTO,
+} from "@/dtos/errors";
 import { JWT } from "@/models";
 import { AccessKey, LoginAttempt, verifyCredentials } from "@/utils";
 import { generateUUID } from "@caffeine/entity/helpers";
+import { BadRequestException } from "@caffeine/errors/application";
+import { MissingPluginDependencyException } from "@caffeine/errors/infra";
+import { t } from "@caffeine/models";
+import { Schema } from "@caffeine/schema";
 import Elysia from "elysia";
 
-const status = {
-	1: "🤯",
-	2: "😡",
-	3: "🫠",
-	4: "😃",
-	5: "😎",
-} as const;
+export function GetAccessController(data: AuthEnvDependenciesDTO) {
+	if (!Schema.make(AuthEnvDependenciesDTO).match(data))
+		throw new MissingPluginDependencyException("auth@login");
 
-export const GetAccessController = new Elysia()
-	.decorate("jwt", new JWT("auth@login"))
-	.post(
+	const { AUTH_EMAIL, AUTH_PASSWORD, JWT_SECRET } = data;
+
+	return new Elysia().decorate("jwt", new JWT("auth@login", JWT_SECRET)).post(
 		"/auth/login",
 		async ({ body, jwt, cookie: { ACCESS_TOKEN }, set }) => {
-			const attempts = (await LoginAttempt.check(
-				body.email,
-			)) as keyof typeof status;
+			const attempts = await LoginAttempt.check(body.email);
 
 			if (attempts <= 0) {
-				console.log(
-					`[💀] Access blocked for ${body.email}. No attempts remaining.`,
-				);
 				set.status = 429;
 				return "Too many attempts. Try again later.";
 			}
 
-			console.log(
-				`[${status[attempts]}] Attempts remaining for ${body.email}: ${attempts}`,
-			);
-
-			const entryIsValid = verifyCredentials(body, "auth@login");
+			const entryIsValid = verifyCredentials(body, "auth@login", {
+				email: AUTH_EMAIL,
+				password: AUTH_PASSWORD,
+			});
 
 			if (entryIsValid) {
 				await LoginAttempt.success(body.email);
 			} else {
-				const remaining = await LoginAttempt.fail(body.email, attempts);
-				console.log(
-					`[🔒] Login failed for ${body.email}. ${remaining} attempts remaining.`,
-				);
+				await LoginAttempt.fail(body.email, attempts);
+
+				throw new BadRequestException("auth@login");
 			}
 
-			// Eu te amaldiçoei ehheheheje
-			const oldAccessKey = (await AccessKey.get(body.email)) ?? "hehe";
 			const accessKey = await AccessKey.set(body.email, generateUUID());
 
 			ACCESS_TOKEN!.value = await jwt.sign({
-				ACCESS_KEY: entryIsValid ? accessKey : oldAccessKey,
+				ACCESS_KEY: accessKey,
 				EMAIL: body.email,
 			});
 			ACCESS_TOKEN!.httpOnly = true;
@@ -65,5 +60,12 @@ export const GetAccessController = new Elysia()
 				description:
 					"Authenticates the user and generates a unique session access key stored in a secure cookie. Features rate limiting with progressive recovery and protection against account enumeration.",
 			},
+			response: {
+				200: t.Undefined(),
+				400: BadRequestExceptionDTO,
+				429: t.String({ examples: "Too many attempts. Try again later." }),
+				503: DatabaseUnavailableExceptionDTO,
+			},
 		},
 	);
+}
