@@ -13,10 +13,8 @@ import {
 import { AuthorizationDTO } from "@caffeine/models/dtos/api";
 
 export const CaffeineAuth = (options: IAuthOptions) => {
-	const SERVICE_NAME = `jwt:for-${options.layerName}`;
-
 	return new Elysia()
-		.decorate(SERVICE_NAME, new JWT(options.layerName))
+		.decorate("jwt", new JWT(options.layerName))
 		.guard({
 			as: "scoped",
 			headers: AuthorizationDTO,
@@ -25,30 +23,28 @@ export const CaffeineAuth = (options: IAuthOptions) => {
 				401: UnauthorizedExceptionDTO,
 			},
 		})
-		.onBeforeHandle(
-			async ({ cookie: { ACCESS_TOKEN }, [SERVICE_NAME]: jwt }) => {
-				if (!ACCESS_TOKEN || typeof ACCESS_TOKEN.value !== "string")
-					throw new UnauthorizedException(options.layerName);
+		.onBeforeHandle(async ({ cookie: { ACCESS_TOKEN }, jwt }) => {
+			if (!ACCESS_TOKEN || typeof ACCESS_TOKEN.value !== "string")
+				throw new UnauthorizedException(options.layerName);
 
-				const value = String(ACCESS_TOKEN.value);
+			const value = String(ACCESS_TOKEN.value);
 
-				const {
-					payload: { ACCESS_KEY, EMAIL },
-				} = await jwt!.verify<{
-					ACCESS_KEY: string | null;
-					EMAIL: string | null;
-				}>(value);
+			const {
+				payload: { ACCESS_KEY, EMAIL },
+			} = await jwt!.verify<{
+				ACCESS_KEY: string | null;
+				EMAIL: string | null;
+			}>(value);
 
-				if (!EMAIL)
-					throw new ResourceNotFoundException(
-						options.layerName,
-						`EMAIL was missing`,
-					);
+			if (!EMAIL)
+				throw new ResourceNotFoundException(
+					options.layerName,
+					`EMAIL was missing`,
+				);
 
-				const currentAccessKey = await AccessKey.get(EMAIL);
+			const currentAccessKey = await AccessKey.get(EMAIL);
 
-				if (!ACCESS_KEY || ACCESS_KEY !== currentAccessKey)
-					throw new UnauthorizedException(options.layerName);
-			},
-		);
+			if (!ACCESS_KEY || ACCESS_KEY !== currentAccessKey)
+				throw new UnauthorizedException(options.layerName);
+		});
 };
