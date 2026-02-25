@@ -10,6 +10,7 @@ import {
 	BadRequestExceptionDTO,
 	UnauthorizedExceptionDTO,
 } from "@/dtos/errors";
+import { AuthorizationDTO } from "@caffeine/models/dtos/api";
 
 export const CaffeineAuth = (options: IAuthOptions) => {
 	const SERVICE_NAME = `jwt:for-${options.layerName}`;
@@ -18,6 +19,7 @@ export const CaffeineAuth = (options: IAuthOptions) => {
 		.decorate(SERVICE_NAME, new JWT(options.layerName))
 		.guard({
 			as: "scoped",
+			headers: AuthorizationDTO,
 			response: {
 				400: BadRequestExceptionDTO,
 				401: UnauthorizedExceptionDTO,
