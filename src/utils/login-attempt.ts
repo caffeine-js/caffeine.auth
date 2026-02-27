@@ -1,46 +1,48 @@
-import { redis } from "@caffeine/redis-drive";
+import type { CaffeineCacheInstance } from "@caffeine/cache";
 
 const MAX_ATTEMPTS = 5;
 const RECOVERY_TIME_PER_ATTEMPT = 60 * 60 * 1000;
 
-export const LoginAttempt = {
-	check: async (email: string): Promise<number> => {
-		const key = `login-attempts:${email}`;
-		const data = await redis.get(key);
+export class LoginAttempt {
+    constructor(private readonly cache: CaffeineCacheInstance) {}
 
-		if (!data) return MAX_ATTEMPTS;
+    async check(email: string): Promise<number> {
+        const key = `login-attempts:${email}`;
+        const data = await this.cache.get(key);
 
-		const { attempts, lastUpdate } = JSON.parse(data) as {
-			attempts: number;
-			lastUpdate: number;
-		};
+        if (!data) return MAX_ATTEMPTS;
 
-		const now = Date.now();
-		const elapsed = now - lastUpdate;
-		const recovered = Math.floor(elapsed / RECOVERY_TIME_PER_ATTEMPT);
+        const { attempts, lastUpdate } = JSON.parse(data) as {
+            attempts: number;
+            lastUpdate: number;
+        };
 
-		const currentAttempts = Math.min(MAX_ATTEMPTS, attempts + recovered);
+        const now = Date.now();
+        const elapsed = now - lastUpdate;
+        const recovered = Math.floor(elapsed / RECOVERY_TIME_PER_ATTEMPT);
 
-		return currentAttempts;
-	},
+        const currentAttempts = Math.min(MAX_ATTEMPTS, attempts + recovered);
 
-	fail: async (email: string, currentAttempts: number): Promise<number> => {
-		const key = `login-attempts:${email}`;
-		const nextAttempts = Math.max(0, currentAttempts - 1);
+        return currentAttempts;
+    }
 
-		await redis.set(
-			key,
-			JSON.stringify({
-				attempts: nextAttempts,
-				lastUpdate: Date.now(),
-			}),
-		);
+    async fail(email: string, currentAttempts: number): Promise<number> {
+        const key = `login-attempts:${email}`;
+        const nextAttempts = Math.max(0, currentAttempts - 1);
 
-		return nextAttempts;
-	},
+        await this.cache.set(
+            key,
+            JSON.stringify({
+                attempts: nextAttempts,
+                lastUpdate: Date.now(),
+            }),
+        );
 
-	success: async (email: string): Promise<void> => {
-		const key = `login-attempts:${email}`;
-		await redis.del(key);
-	},
-};
+        return nextAttempts;
+    }
+
+    async success(email: string): Promise<void> {
+        const key = `login-attempts:${email}`;
+        await this.cache.del(key);
+    }
+}

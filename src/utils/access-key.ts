@@ -1,26 +1,28 @@
+import type { CaffeineCacheInstance } from "@caffeine/cache";
 import { CACHE_EXPIRATION_TIME } from "@caffeine/constants";
-import { redis } from "@caffeine/redis-drive";
 import { DatabaseUnavailableException } from "@caffeine/errors/infra";
 
-export const AccessKey = {
-	get: async (email: string): Promise<string | null> => {
-		return await redis.get(`access-key:${email}`);
-	},
+export class AccessKey {
+    constructor(private readonly cache: CaffeineCacheInstance) {}
 
-	set: async (email: string, value: string): Promise<string> => {
-		try {
-			await redis.setex(
-				`access-key:${email}`,
-				CACHE_EXPIRATION_TIME.SAFE,
-				value,
-			);
+    async get(email: string): Promise<string | null> {
+        return await this.cache.get(`access-key:${email}`);
+    }
 
-			return value;
-		} catch (_) {
-			throw new DatabaseUnavailableException(
-				"auth@login",
-				"Redis is Unavailable",
-			);
-		}
-	},
-};
+    async set(email: string, value: string): Promise<string> {
+        try {
+            await this.cache.setex(
+                `access-key:${email}`,
+                CACHE_EXPIRATION_TIME.SAFE,
+                value,
+            );
+
+            return value;
+        } catch (_) {
+            throw new DatabaseUnavailableException(
+                "auth@login",
+                "Redis is Unavailable",
+            );
+        }
+    }
+}

@@ -56,12 +56,13 @@
         "elysia": "^1.4.26"
     },
     "dependencies": {
+        "@caffeine/constants": "link:@caffeine/constants",
+        "@caffeine/entity": "link:@caffeine/entity",
         "@caffeine/errors": "link:@caffeine/errors",
         "@caffeine/models": "link:@caffeine/models",
         "@caffeine/schema": "link:@caffeine/schema",
-        "@caffeine/entity": "link:@caffeine/entity",
-        "@caffeine/redis-drive": "link:@caffeine/redis-drive",
-        "@caffeine/constants": "link:@caffeine/constants",
+        "@caffeine/cache": "link:@caffeine/cache",
+        "ioredis-mock": "^8.13.1",
         "jose": "^6.1.3"
     }
 }
